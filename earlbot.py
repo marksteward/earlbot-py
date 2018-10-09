@@ -2,6 +2,7 @@ import asyncio
 from datetime import datetime
 from importlib import reload
 import os
+from pytz import utc, timezone
 import sqlite3
 import sys
 import yaml
@@ -15,7 +16,8 @@ def adapt_ts(dt):
     return int(dt.timestamp())
 
 def convert_ts(i):
-    return datetime.utcfromtimestamp(float(i))
+    dt = datetime.fromtimestamp(float(i), utc)
+    return dt.astimezone(timezone('Europe/London'))
 
 sqlite3.register_adapter(datetime, adapt_ts)
 sqlite3.register_converter('timestamp', convert_ts)
@@ -62,11 +64,13 @@ class EarlBot(MinimalClient):
 
         if self.is_channel(target):
             channel = target
+            respond_to = channel
         else:
             # Mostly match perl for now, although it seems to also have $$* for announcements?
             channel = 'msg'
+            respond_to = source
 
-        now = datetime.utcnow()
+        now = datetime.now(utc)
 
         urls = handler.find_urls(message)
         for url in urls:
@@ -81,7 +85,7 @@ class EarlBot(MinimalClient):
                         if olde:
                             nick, timestamp = olde
                             msg += ' (First posted by {}, {})'.format(nick, timestamp.strftime('%c'))
-                        await self.message(target, msg)
+                        await self.message(respond_to, msg)
 
 
 config = yaml.safe_load(open(sys.argv[1], 'r'))
