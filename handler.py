@@ -1,17 +1,22 @@
+import aiohttp
 import re
 from lxml import html
-import requests
 
 print("Reloading")
 
 async def get_title(bot, target, source, url):
-    resp = requests.get(url)
+    async with aiohttp.ClientSession() as session:
+        async with session.get(url) as resp:
+            resp = await resp.text()
+
     if not resp:
         return None
-    tree = html.fromstring(resp.content)
+
+    tree = html.fromstring(resp)
     title = tree.find(".//title").text
     if not title:
         return "dunno"
+
     return title
 
 def find_urls(message):

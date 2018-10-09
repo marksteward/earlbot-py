@@ -1,7 +1,8 @@
+aiohttp
+aiodns
 #aionotify
 git+https://github.com/marksteward/aionotify#egg=aionotify
 lxml
 #pydle
 git+https://github.com/marksteward/pydle#egg=pydle
 pyyaml
-requests
