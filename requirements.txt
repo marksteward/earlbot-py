@@ -1,0 +1,6 @@
+pyyaml
+#aionotify
+#pydle>=0.8.4
+#git+https://github.com/Shizmob/pydle#egg=pydle
+../pydle
+../aionotify
