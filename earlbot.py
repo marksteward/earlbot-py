@@ -30,7 +30,7 @@ class EarlBot(MinimalClient):
         super().__init__(config['nick'], realname='Earlbot')
 
     async def connect(self):
-        await super().connect(self.config['host'], tls=True, tls_verify=True)
+        await super().connect(self.config['host'], tls=True, tls_verify=True, password=self.config['password'])
 
     async def on_connect(self):
         for channel in self.config['channels']:
@@ -75,7 +75,7 @@ class EarlBot(MinimalClient):
                 self.save_url(url, source, now, channel)
 
             if hasattr(handler, 'get_title'):
-                title = await handler.get_title(self, target, source, message)
+                title = await handler.get_title(self, target, source, url)
                 if title:
                         msg = '[ {} ]'.format(title)
                         if olde:
