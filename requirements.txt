@@ -7,3 +7,4 @@ lxml
 git+https://github.com/marksteward/pydle#egg=pydle
 pytz
 pyyaml
+urlextract==0.8.3
