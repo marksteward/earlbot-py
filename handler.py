@@ -19,7 +19,7 @@ async def get_title(bot, target, source, url):
     if not title:
         return "dunno"
 
-    return title
+    return title.replace('\n', ' ')
 
 def find_urls(message):
     extractor = URLExtract()
