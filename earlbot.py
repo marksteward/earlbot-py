@@ -31,8 +31,8 @@ class EarlBot(MinimalClient):
 
         super().__init__(config['nick'], realname='Earlbot')
 
-    async def connect(self):
-        await super().connect(self.config['host'], tls=True, tls_verify=True, password=self.config['password'])
+    async def connect(self, *args, **kwargs):
+        await super().connect(self.config['host'], *args, tls=True, tls_verify=True, password=self.config['password'], **kwargs)
 
     async def on_connect(self):
         for channel in self.config['channels']:
