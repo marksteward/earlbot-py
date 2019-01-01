@@ -1,0 +1,8 @@
+bots:
+ - db: example.db
+   nick: earlbottttttt
+   host: chat.freenode.net
+   channels:
+    - '#earlbot'
+    - '#earlbot2'
+   password:
