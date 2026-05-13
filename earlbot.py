@@ -7,7 +7,7 @@ import sqlite3
 import sys
 import yaml
 
-import aionotify
+from asyncinotify import Inotify, Mask
 from pydle import Client
 
 from handler import handler
@@ -103,43 +103,55 @@ class EarlBot(Client):
         await handler.process_message(self, message, source, respond_to, channel)
 
 
-async def watch_handler():
-    flags = aionotify.Flags.MODIFY | aionotify.Flags.CREATE | aionotify.Flags.MOVED_TO | aionotify.Flags.IGNORED
-    dir_ = os.path.dirname(handler.__file__)
-    file_ = os.path.basename(handler.__file__)
-    watcher = aionotify.Watcher()
-    watcher.watch(dir_, flags)
-    loop = asyncio.get_event_loop()
-    await watcher.setup(loop)
+async def watch_files(handlers):
+    inotify = Inotify()
+    handlers = {os.path.realpath(f): h for f, h in handlers.items()}
+    dirs = {os.path.dirname(f) for f, h in handlers.items()}
+    for dir_ in dirs:
+        print(f"Watching directory {dir_}")
+        inotify.add_watch(dir_, Mask.MODIFY | Mask.CREATE | Mask.MOVED_TO | Mask.IGNORED)
 
-    while True:
-        event = await watcher.get_event()
-
-        if event.name == '' and event.flags & aionotify.Flags.IGNORED:
+    async for event in inotify:
+        if event.mask & Mask.IGNORED:
             print("inotify watch was removed by OS, cannot reload automatically")
             break
 
-        if event.name != file_:
+        if str(event.path) not in handlers:
+            print(f"Ignoring {event.mask} for path {event.path}")
             continue
 
+        print(f"Calling reload handler after {event.mask} for {event.path}")
         try:
-            reload(handler)
+            handlers[str(event.path)]()
         except Exception as e:
             print(f"Exception reloading: {e}")
 
-    watcher.close()
-
 
 async def main():
-    config = yaml.safe_load(open(sys.argv[1], 'r'))
-    bot = config['bots'][0]
+    configfile = sys.argv[1]
+    config = yaml.safe_load(open(configfile, 'r'))
+    # Only one instance now
+    client = EarlBot(config['bots'][0])
 
-    client = EarlBot(bot)
+    def reload_handler():
+        reload(handler)
+
+    def reload_config():
+        config = yaml.safe_load(open(configfile, 'r'))
+        if not config or not config.get('bots'):
+            print(f"Config appears to be empty, ignoring")
+            return
+        client.config = config['bots'][0]
+
+    files = {
+        handler.__file__: reload_handler,
+        configfile: reload_config,
+    }
+
     await asyncio.gather(
         client.connect(),
-        watch_handler(),
+        watch_files(files),
     )
-
 
 asyncio.run(main())
 

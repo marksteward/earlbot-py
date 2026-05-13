@@ -1,8 +1,16 @@
-.PHONY: init run
+.PHONY: build run run-test shell logs
+
+build:
+	docker build -t earlbot --no-cache .
 
 run:
-	python earlbot.py earlbot.yml
+	docker run -t -d --name earlbot --restart=on-failure -v $$PWD/config:/config -v $$PWD/data:/data -v $$PWD/handler:/app/handler earlbot /config/earlbot.yml
 
-init:
-	virtualenv --clear -p python3 env
-	env/bin/pip install -r requirements.txt
+logs:
+	docker logs -f earlbot --since=10m
+
+run-test:
+	docker run --rm -ti -v $$PWD/config-test:/config -v $$PWD/data:/data -v $$PWD/handler:/app/handler $$(docker build -q .) /config/earlbot-test.yml
+
+shell:
+	docker exec -ti earlbot bash

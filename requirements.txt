@@ -1,7 +1,6 @@
 aiohttp
 aiodns
-#aionotify
-git+https://github.com/marksteward/aionotify#egg=aionotify
+asyncinotify
 lxml
 pydle
 #git+https://github.com/marksteward/pydle#egg=pydle
