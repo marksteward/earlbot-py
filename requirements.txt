@@ -3,8 +3,8 @@ aiodns
 #aionotify
 git+https://github.com/marksteward/aionotify#egg=aionotify
 lxml
-#pydle
-git+https://github.com/marksteward/pydle#egg=pydle
+pydle
+#git+https://github.com/marksteward/pydle#egg=pydle
 pytz
 pyyaml
 urlextract==0.8.3

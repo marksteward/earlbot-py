@@ -8,9 +8,10 @@ import sys
 import yaml
 
 import aionotify
-from pydle import MinimalClient
+from pydle import Client
 
-import handler
+from handler import handler
+
 
 def adapt_ts(dt):
     return int(dt.timestamp())
@@ -23,19 +24,40 @@ sqlite3.register_adapter(datetime, adapt_ts)
 sqlite3.register_converter('timestamp', convert_ts)
 
 
-class EarlBot(MinimalClient):
+class EarlBot(Client):
     def __init__(self, config):
         self.config = config
         self.db = sqlite3.connect(config['db'], detect_types=sqlite3.PARSE_COLNAMES)
         self.current_nick = None
 
-        super().__init__(config['nick'], realname='Earlbot')
+        kwargs = {
+           'realname': 'Earlbot',
+        }
+        if 'sasl_password' in self.config:
+            kwargs.update({
+                'sasl_username': self.config.get('sasl_username', self.config['nick']),
+                'sasl_password': self.config['sasl_password'],
+            })
+
+        super().__init__(config['nick'], **kwargs)
 
     async def connect(self, *args, **kwargs):
-        await super().connect(self.config['host'], *args, tls=True, tls_verify=True, password=self.config['password'], **kwargs)
+        kwargs.update({
+            'tls': True,
+            'tls_verify': True,
+            'password': self.config['password'],
+        })
+        await super().connect(self.config['host'], *args, **kwargs)
 
     async def on_connect(self):
+        print("Connected, joining channels")
         for channel in self.config['channels']:
+            if not channel:
+                print("Missing channel, make sure to use quotes around channel names")
+                continue
+            await asyncio.sleep(0.8)
+            # FIXME: wait for the channel to sync before continuing
+            print(f"Joining {channel}")
             await self.join(channel)
 
     def get_url(self, url, channel):
@@ -52,14 +74,22 @@ class EarlBot(MinimalClient):
         self.db.commit()
 
     async def on_nick_change(self, old, new):
-        print("Nick now {}".format(new))
+        print(f"Nick for {old} now {new}")
         self.current_nick = new
+        if old == self.current_nick:
+            print("Updated own nick")
+
+        elif old == '<unregistered>' and new != self.current_nick:
+            print(f"Nick is {new}, attempting to regain earlbot")
+            await self.message('nickserv', 'regain')
 
     async def on_message(self, target, source, message):
+        print(target, source, message)
         if source == self.current_nick:
             return
 
-        if not hasattr(handler, 'find_urls'):
+        if not hasattr(handler, 'process_message'):
+            print("Error: no process_message handler")
             return
 
         if self.is_channel(target):
@@ -70,31 +100,8 @@ class EarlBot(MinimalClient):
             channel = 'msg'
             respond_to = source
 
-        now = datetime.now(utc)
+        await handler.process_message(self, message, source, respond_to, channel)
 
-        urls = handler.find_urls(message)
-        for url in urls:
-            olde = self.get_url(url, channel)
-            if not olde:
-                self.save_url(url, source, now, channel)
-
-            if hasattr(handler, 'get_title'):
-                title = await handler.get_title(self, target, source, url)
-                if title:
-                        msg = '[ {} ]'.format(title)
-                        if olde:
-                            nick, timestamp = olde
-                            msg += ' (First posted by {}, {})'.format(nick, timestamp.strftime('%c'))
-                        await self.message(respond_to, msg)
-
-
-config = yaml.safe_load(open(sys.argv[1], 'r'))
-
-bot = config['bots'][0]
-
-loop = asyncio.get_event_loop()
-client = EarlBot(bot)
-asyncio.ensure_future(client.connect(), loop=loop)
 
 async def watch_handler():
     flags = aionotify.Flags.MODIFY | aionotify.Flags.CREATE | aionotify.Flags.MOVED_TO | aionotify.Flags.IGNORED
@@ -102,12 +109,13 @@ async def watch_handler():
     file_ = os.path.basename(handler.__file__)
     watcher = aionotify.Watcher()
     watcher.watch(dir_, flags)
+    loop = asyncio.get_event_loop()
     await watcher.setup(loop)
 
     while True:
         event = await watcher.get_event()
 
-        if event.name == '' and flags & aionotify.Flags.IGNORED:
+        if event.name == '' and event.flags & aionotify.Flags.IGNORED:
             print("inotify watch was removed by OS, cannot reload automatically")
             break
 
@@ -117,11 +125,21 @@ async def watch_handler():
         try:
             reload(handler)
         except Exception as e:
-            print("Exception reloading: {}".format(e))
+            print(f"Exception reloading: {e}")
 
     watcher.close()
 
-asyncio.ensure_future(watch_handler(), loop=loop)
 
-loop.run_forever()
+async def main():
+    config = yaml.safe_load(open(sys.argv[1], 'r'))
+    bot = config['bots'][0]
+
+    client = EarlBot(bot)
+    await asyncio.gather(
+        client.connect(),
+        watch_handler(),
+    )
+
+
+asyncio.run(main())
 
