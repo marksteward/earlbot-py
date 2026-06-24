@@ -6,8 +6,10 @@ from urlextract import URLExtract
 
 print("Reloading")
 
+headers = {'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_10_1) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/39.0.2171.95 Safari/537.36'}
+
 async def get_title(bot, target, source, url):
-    async with aiohttp.ClientSession() as session:
+    async with aiohttp.ClientSession(headers=headers) as session:
         async with session.get(url) as resp:
             resp = await resp.text()
 
